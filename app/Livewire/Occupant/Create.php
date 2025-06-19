@@ -40,7 +40,7 @@ class Create extends Component
         $this->validate();
 
         Occupant::create([
-            'pic_id' => Storage::disk('s3')->putFileAs('lara-storage', $this->pic_id),
+            'pic_id' => $this->pic_id,
             'firstname' => $this->firstname,
             'middlename' => $this->middlename,
             'lastname' => $this->lastname,
