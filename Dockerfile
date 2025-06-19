@@ -1,5 +1,5 @@
 # Use official PHP image with FPM
-FROM php:8.2-fpm
+FROM serversideup/php:8.4-fpm-alpine
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
