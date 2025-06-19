@@ -1,41 +1,42 @@
-FROM serversideup/php:8.3-fpm-nginx
+# Use official PHP image with FPM
+FROM php:8.2-fpm
 
-# Environment configuration
-ENV PHP_OPCACHE_ENABLE=1 \
-    NODE_ENV=production \
-    COMPOSER_NO_INTERACTION=1
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip
 
-# Install system dependencies as root
-USER root
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js (optimized single layer)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
-# Create and set proper permissions for web root
-RUN mkdir -p /var/www/html && \
-    chown -R www-data:www-data /var/www/html
-
-# Copy application files (with proper permissions)
-COPY --chown=www-data:www-data . /var/www/html
-
-# Switch to application user
-USER www-data
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Set working directory
-WORKDIR /var/www/html
+WORKDIR /var/www
 
-# Install and build frontend assets (optimized layer)
-RUN npm ci --no-audit --prefer-offline && \
-    npm run build && \
-    rm -rf ~/.npm /tmp/*
+# Copy only composer files first to optimize Docker layer caching
+COPY composer.json composer.lock ./
 
-# Install PHP dependencies (optimized layer)
-RUN composer install --no-dev --optimize-autoloader --no-interaction && \
-    composer clear-cache
+# Install dependencies (without scripts to avoid missing class errors)
+RUN composer install --no-interaction --no-scripts --no-autoloader --no-dev
 
-# Optional: Cleanup unnecessary files
-RUN rm -rf /var/www/html/node_modules && \
-    rm -rf /var/www/html/tests
+# Copy the rest of the application files
+COPY . .
+
+# Finish composer installation
+RUN composer install --no-interaction --optimize-autoloader --no-dev
+
+# Permissions
+RUN chown -R www-data:www-data /var/www/storage
+RUN chmod -R 775 /var/www/storage
+
+RUN rm -rf /app/cache
